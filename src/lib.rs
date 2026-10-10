@@ -12,6 +12,7 @@
 //! * [`query`]: an InfluxQL-flavoured query language with a planner and
 //!   executor supporting range scans, aggregates and `GROUP BY time()`.
 //! * [`downsample`]: watermark-driven rollups into coarser measurements.
+//! * [`server`]: an axum HTTP API with line protocol ingest and queries.
 
 #![warn(missing_docs)]
 #![forbid(unsafe_code)]
@@ -24,6 +25,7 @@ pub mod error;
 pub mod lineproto;
 pub mod model;
 pub mod query;
+pub mod server;
 pub mod storage;
 
 pub use clock::{Clock, ManualClock, SystemClock};
