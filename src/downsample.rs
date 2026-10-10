@@ -175,6 +175,11 @@ pub fn run_rule(db: &Db, rule: &DownsampleRule) -> Result<DownsampleReport> {
             .unwrap_or_default()
     });
     let data = db.read_series(&ids, from, horizon)?;
+    if from == Timestamp::MIN && data.iter().all(Vec::is_empty) {
+        // Nothing has been written yet. Recording a watermark now would make
+        // the rule skip any backfilled data that arrives later.
+        return Ok(report);
+    }
     let mut out = Vec::new();
     for (id, points) in ids.iter().zip(data) {
         if points.is_empty() {

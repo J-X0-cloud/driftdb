@@ -138,3 +138,18 @@ fn retention_expires_raw_data_but_keeps_recent_rollups() {
     assert!(db.query("SELECT * FROM cpu").unwrap().series.is_empty());
     assert!(db.stats().unwrap().segments.is_empty());
 }
+
+#[test]
+fn rule_waits_for_first_data_before_setting_a_watermark() {
+    let dir = tempfile::tempdir().unwrap();
+    let clock = Arc::new(ManualClock::new(60 * MIN));
+    let db = open(dir.path(), clock, None);
+    let rule: DownsampleRule = "cpu:5m:count".parse().unwrap();
+    assert_eq!(run_rule(&db, &rule).unwrap().watermark, None);
+    assert_eq!(db.downsample_watermark("cpu_5m"), None);
+    // Backfilled history is still picked up on the next run.
+    write_minutes(&db, 0, 10);
+    let report = run_rule(&db, &rule).unwrap();
+    assert_eq!(report.points, 4);
+    assert_eq!(report.watermark, Some(55 * MIN));
+}
