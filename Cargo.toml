@@ -43,3 +43,11 @@ debug = 1
 
 [profile.bench]
 debug = 1
+
+[[bench]]
+name = "compression"
+harness = false
+
+[[bench]]
+name = "engine"
+harness = false
