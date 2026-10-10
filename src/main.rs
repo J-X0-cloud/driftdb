@@ -140,6 +140,21 @@ enum Format {
     Json,
 }
 
+/// `println!` that reports a closed stdout (for example `| head`) as an
+/// I/O error instead of panicking.
+macro_rules! outln {
+    ($($arg:tt)*) => {
+        writeln!(io::stdout(), $($arg)*)?
+    };
+}
+
+/// `print!` counterpart of [`outln!`].
+macro_rules! out {
+    ($($arg:tt)*) => {
+        write!(io::stdout(), $($arg)*)?
+    };
+}
+
 fn duration_arg(s: &str) -> Result<i64, String> {
     parse_duration(s).ok_or_else(|| format!("invalid duration {s:?} (examples: 10s, 5m, 30d)"))
 }
@@ -172,6 +187,8 @@ fn main() -> ExitCode {
 
     match run(cli) {
         Ok(()) => ExitCode::SUCCESS,
+        // The reader went away (e.g. `driftdb query ... | head`); not an error.
+        Err(Error::Io(e)) if e.kind() == io::ErrorKind::BrokenPipe => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("error: {e}");
             ExitCode::FAILURE
@@ -237,8 +254,8 @@ fn run(cli: Cli) -> driftdb::Result<()> {
         Command::Flush => {
             let db = Db::open(&cli.data_dir, opts)?;
             match db.flush()? {
-                Some(meta) => println!("flushed {} points into segment {}", meta.points, meta.id),
-                None => println!("memtable was empty"),
+                Some(meta) => outln!("flushed {} points into segment {}", meta.points, meta.id),
+                None => outln!("memtable was empty"),
             }
             Ok(())
         }
@@ -251,10 +268,10 @@ fn run(cli: Cli) -> driftdb::Result<()> {
                 db.compact()?
             };
             if reports.is_empty() {
-                println!("nothing to compact");
+                outln!("nothing to compact");
             }
             for r in reports {
-                println!(
+                outln!(
                     "merged {:?} -> {} (level {}): {} -> {} points, {} -> {} bytes",
                     r.inputs,
                     r.output
@@ -275,14 +292,14 @@ fn run(cli: Cli) -> driftdb::Result<()> {
                 ));
             }
             let db = Db::open(&cli.data_dir, opts)?;
-            println!("removed {} segment(s)", db.enforce_retention()?);
+            outln!("removed {} segment(s)", db.enforce_retention()?);
             Ok(())
         }
         Command::Downsample { rules } => {
             let db = Db::open(&cli.data_dir, opts)?;
             for rule in &rules {
                 let r = run_rule(&db, rule)?;
-                println!(
+                outln!(
                     "{rule}: {} windows, {} points, watermark {}",
                     r.windows,
                     r.points,
@@ -294,7 +311,7 @@ fn run(cli: Cli) -> driftdb::Result<()> {
         Command::Stats => {
             let db = Db::open(&cli.data_dir, opts)?;
             let stats = db.stats()?;
-            println!(
+            outln!(
                 "{}",
                 serde_json::to_string_pretty(&stats)
                     .map_err(|e| Error::InvalidArgument(e.to_string()))?
@@ -356,12 +373,12 @@ fn print_result(result: &driftdb::QueryResult, format: Format, epoch: bool) -> d
     match format {
         Format::Table => {
             if result.series.is_empty() {
-                println!("(no results)");
+                outln!("(no results)");
             } else {
-                print!("{}", result.to_table(!epoch));
+                out!("{}", result.to_table(!epoch));
             }
         }
-        Format::Json => println!(
+        Format::Json => outln!(
             "{}",
             serde_json::to_string_pretty(result)
                 .map_err(|e| Error::InvalidArgument(e.to_string()))?
@@ -377,7 +394,7 @@ fn shell(db: Db) -> driftdb::Result<()> {
     let mut input = stdin.lock();
     loop {
         if interactive {
-            print!(
+            out!(
                 "{}",
                 if statement.is_empty() {
                     "driftdb> "
@@ -409,7 +426,7 @@ fn shell(db: Db) -> driftdb::Result<()> {
             Ok(result) => {
                 print_result(&result, Format::Table, false)?;
                 if interactive {
-                    println!("({:.1} ms)", started.elapsed().as_secs_f64() * 1e3);
+                    outln!("({:.1} ms)", started.elapsed().as_secs_f64() * 1e3);
                 }
             }
             Err(e) => eprintln!("error: {e}"),
@@ -447,33 +464,36 @@ fn inspect(path: &Path) -> driftdb::Result<()> {
         block_bytes += bytes;
         per_series.push((sid, pts, handles.len(), bytes));
     }
-    println!("segment       {}", path.display());
-    println!("file bytes    {}", stats.bytes);
-    println!("series        {}", stats.series);
-    println!("points        {}", stats.points);
-    println!("blocks        {blocks}");
+    outln!("segment       {}", path.display());
+    outln!("file bytes    {}", stats.bytes);
+    outln!("series        {}", stats.series);
+    outln!("points        {}", stats.points);
+    outln!("blocks        {blocks}");
     if stats.points > 0 {
-        println!(
+        outln!(
             "time range    {} .. {}",
             format_rfc3339(stats.min_ts),
             format_rfc3339(stats.max_ts)
         );
-        println!(
+        outln!(
             "compression   {:.2} bytes/point in blocks ({:.1}x vs 16 raw bytes)",
             block_bytes as f64 / stats.points as f64,
             16.0 * stats.points as f64 / block_bytes.max(1) as f64
         );
     }
     per_series.sort_by(|a, b| b.1.cmp(&a.1));
-    println!(
+    outln!(
         "\n{:>10}  {:>10}  {:>6}  {:>10}",
-        "series", "points", "blocks", "bytes"
+        "series",
+        "points",
+        "blocks",
+        "bytes"
     );
     for (sid, pts, nblocks, bytes) in per_series.iter().take(20) {
-        println!("{sid:>10}  {pts:>10}  {nblocks:>6}  {bytes:>10}");
+        outln!("{sid:>10}  {pts:>10}  {nblocks:>6}  {bytes:>10}");
     }
     if per_series.len() > 20 {
-        println!("... {} more series", per_series.len() - 20);
+        outln!("... {} more series", per_series.len() - 20);
     }
     Ok(())
 }
