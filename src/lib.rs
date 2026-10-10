@@ -27,4 +27,5 @@ pub mod storage;
 pub use clock::{Clock, ManualClock, SystemClock};
 pub use db::{CompactionReport, Db, DbStats, Options, WriteSummary};
 pub use error::{Error, Result};
+pub use query::{QueryResult, ResultSeries, Value};
 pub use model::{Point, Precision, SeriesId, SeriesKey, Timestamp};
