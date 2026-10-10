@@ -9,6 +9,8 @@
 //!   and the manifest.
 //! * [`db`]: the engine that ties storage together (flush, compaction,
 //!   retention).
+//! * [`query`]: an InfluxQL-flavoured query language with a planner and
+//!   executor supporting range scans, aggregates and `GROUP BY time()`.
 
 #![warn(missing_docs)]
 #![forbid(unsafe_code)]
@@ -19,6 +21,7 @@ pub mod encoding;
 pub mod error;
 pub mod lineproto;
 pub mod model;
+pub mod query;
 pub mod storage;
 
 pub use clock::{Clock, ManualClock, SystemClock};
