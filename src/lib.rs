@@ -11,11 +11,13 @@
 #![warn(missing_docs)]
 #![forbid(unsafe_code)]
 
+pub mod clock;
 pub mod encoding;
 pub mod error;
 pub mod lineproto;
 pub mod model;
 pub mod storage;
 
+pub use clock::{Clock, ManualClock, SystemClock};
 pub use error::{Error, Result};
 pub use model::{Point, Precision, SeriesId, SeriesKey, Timestamp};
