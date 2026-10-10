@@ -1,6 +1,7 @@
 //! Durable storage: record framing, catalog, WAL, memtable and segments.
 
 pub mod catalog;
+pub mod manifest;
 pub mod memtable;
 pub mod merge;
 pub mod record;
