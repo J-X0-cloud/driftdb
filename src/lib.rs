@@ -7,11 +7,14 @@
 //! * [`model`] and [`lineproto`]: series keys, points and line protocol.
 //! * [`storage`]: record framing, series catalog, WAL, memtable, segments
 //!   and the manifest.
+//! * [`db`]: the engine that ties storage together (flush, compaction,
+//!   retention).
 
 #![warn(missing_docs)]
 #![forbid(unsafe_code)]
 
 pub mod clock;
+pub mod db;
 pub mod encoding;
 pub mod error;
 pub mod lineproto;
@@ -19,5 +22,6 @@ pub mod model;
 pub mod storage;
 
 pub use clock::{Clock, ManualClock, SystemClock};
+pub use db::{CompactionReport, Db, DbStats, Options, WriteSummary};
 pub use error::{Error, Result};
 pub use model::{Point, Precision, SeriesId, SeriesKey, Timestamp};
