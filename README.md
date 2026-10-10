@@ -148,7 +148,10 @@ cargo build --release
 PORT=8086 ./target/release/driftdb --retention 30d serve \
     --downsample "cpu:5m:mean,max:cpu_5m"
 
-curl --data-binary 'cpu,host=a,region=eu usage_user=12.5,usage_system=3 1700000000' \
+# no timestamp: the server stamps the point with its current time
+curl --data-binary 'cpu,host=a,region=eu usage_user=12.5,usage_system=3' \
+     'localhost:8086/write'
+curl --data-binary "cpu,host=b,region=us usage_user=40 $(date +%s)" \
      'localhost:8086/write?precision=s'
 curl -G localhost:8086/query --data-urlencode 'q=SELECT * FROM cpu'
 curl -G localhost:8086/query --data-urlencode 'q=SHOW SERIES' --data-urlencode format=table
@@ -158,7 +161,7 @@ curl localhost:8086/stats
 | Method | Path | Notes |
 |--------|------|-------|
 | `GET` | `/health` | Liveness probe |
-| `POST` | `/write?precision=ns\|us\|ms\|s` | Line protocol body; `204` on success, `400` with `{"error": ...}` on bad input |
+| `POST` | `/write?precision=ns\|us\|ms\|s` | Line protocol body; `204` on success, `200` with `{"written": n, "expired": m}` when some points were older than the retention window and dropped, `400` with `{"error": ...}` on bad input |
 | `GET`/`POST` | `/query?q=...&format=json\|table` | The query may also be sent as the POST body |
 | `GET` | `/stats` | Series count, memtable size, WAL bytes, segments |
 | `POST` | `/admin/flush`, `/admin/compact[?full=true]`, `/admin/retention` | Manual maintenance |
