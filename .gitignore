@@ -1,0 +1,6 @@
+/target
+**/*.rs.bk
+*.profraw
+/data
+/driftdb-data
+.DS_Store
