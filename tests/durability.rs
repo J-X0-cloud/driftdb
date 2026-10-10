@@ -54,7 +54,8 @@ fn torn_wal_tail_loses_only_the_last_batch() {
     {
         let db = Db::open(dir.path(), opts()).unwrap();
         for i in 0..10 {
-            db.write_points(&[Point::new(key("a"), i, i as f64)]).unwrap();
+            db.write_points(&[Point::new(key("a"), i, i as f64)])
+                .unwrap();
         }
     }
     let wal = wal_files(dir.path()).pop().unwrap();
@@ -82,7 +83,9 @@ fn crash_between_segment_write_and_manifest_update() {
     let dir = tempfile::tempdir().unwrap();
     let crashed = tempfile::tempdir().unwrap();
     let db = Db::open(dir.path(), opts()).unwrap();
-    let batch: Vec<Point> = (0..500).map(|i| Point::new(key("a"), i, i as f64)).collect();
+    let batch: Vec<Point> = (0..500)
+        .map(|i| Point::new(key("a"), i, i as f64))
+        .collect();
     db.write_points(&batch).unwrap();
 
     // Snapshot the directory as it was just before the flush...
@@ -92,13 +95,26 @@ fn crash_between_segment_write_and_manifest_update() {
     // after renaming it into place but before the manifest was rewritten.
     for entry in fs::read_dir(dir.path().join("segments")).unwrap() {
         let entry = entry.unwrap();
-        fs::copy(entry.path(), crashed.path().join("segments").join(entry.file_name())).unwrap();
+        fs::copy(
+            entry.path(),
+            crashed.path().join("segments").join(entry.file_name()),
+        )
+        .unwrap();
     }
 
     let recovered = Db::open(crashed.path(), opts()).unwrap();
     assert_eq!(read(&recovered, "a"), read(&db, "a"));
-    assert_eq!(recovered.stats().unwrap().segments.len(), 0, "orphan must not be adopted");
-    assert_eq!(fs::read_dir(crashed.path().join("segments")).unwrap().count(), 0);
+    assert_eq!(
+        recovered.stats().unwrap().segments.len(),
+        0,
+        "orphan must not be adopted"
+    );
+    assert_eq!(
+        fs::read_dir(crashed.path().join("segments"))
+            .unwrap()
+            .count(),
+        0
+    );
     // Flushing the replayed WAL produces the segment for real.
     recovered.flush().unwrap();
     drop(recovered);
@@ -112,7 +128,8 @@ fn flushed_wal_files_are_removed() {
     let dir = tempfile::tempdir().unwrap();
     let db = Db::open(dir.path(), opts()).unwrap();
     for round in 0..3 {
-        db.write_points(&[Point::new(key("a"), round, 1.0)]).unwrap();
+        db.write_points(&[Point::new(key("a"), round, 1.0)])
+            .unwrap();
         db.flush().unwrap();
     }
     assert_eq!(wal_files(dir.path()).len(), 1);
@@ -124,11 +141,18 @@ fn corrupt_segment_block_surfaces_an_error() {
     let dir = tempfile::tempdir().unwrap();
     {
         let db = Db::open(dir.path(), opts()).unwrap();
-        let batch: Vec<Point> = (0..100).map(|i| Point::new(key("a"), i, i as f64 * 0.5)).collect();
+        let batch: Vec<Point> = (0..100)
+            .map(|i| Point::new(key("a"), i, i as f64 * 0.5))
+            .collect();
         db.write_points(&batch).unwrap();
         db.flush().unwrap();
     }
-    let seg = fs::read_dir(dir.path().join("segments")).unwrap().next().unwrap().unwrap().path();
+    let seg = fs::read_dir(dir.path().join("segments"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
     let mut bytes = fs::read(&seg).unwrap();
     bytes[20] ^= 0x55;
     fs::write(&seg, bytes).unwrap();
@@ -150,7 +174,10 @@ fn unknown_series_in_wal_is_corruption() {
     }
     // Lose the catalog but keep the WAL that references series 0.
     fs::write(dir.path().join("series.log"), b"").unwrap();
-    assert!(matches!(Db::open(dir.path(), opts()), Err(Error::Corruption(_))));
+    assert!(matches!(
+        Db::open(dir.path(), opts()),
+        Err(Error::Corruption(_))
+    ));
 }
 
 #[test]
@@ -191,7 +218,9 @@ fn concurrent_writers_readers_and_maintenance() {
         let db = db.clone();
         thread::spawn(move || {
             for _ in 0..50 {
-                let r = db.query("SELECT count(usage) FROM cpu GROUP BY host").unwrap();
+                let r = db
+                    .query("SELECT count(usage) FROM cpu GROUP BY host")
+                    .unwrap();
                 for s in &r.series {
                     let count = s.values[0][1].as_f64().unwrap();
                     assert!(count <= PER_WRITER as f64);
@@ -220,5 +249,8 @@ fn concurrent_writers_readers_and_maintenance() {
         assert!(pts.iter().all(|(t, v)| *t as f64 == *v));
     }
     let r = db.query("SELECT count(usage) FROM cpu").unwrap();
-    assert_eq!(r.series[0].values[0][1].as_f64(), Some((WRITERS as i64 * PER_WRITER) as f64));
+    assert_eq!(
+        r.series[0].values[0][1].as_f64(),
+        Some((WRITERS as i64 * PER_WRITER) as f64)
+    );
 }

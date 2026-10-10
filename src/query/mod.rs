@@ -116,7 +116,9 @@ impl QueryResult {
                 .map(|row| {
                     row.iter()
                         .enumerate()
-                        .map(|(i, v)| v.render(s.columns.get(i).is_some_and(|c| c == "time"), rfc3339))
+                        .map(|(i, v)| {
+                            v.render(s.columns.get(i).is_some_and(|c| c == "time"), rfc3339)
+                        })
                         .collect()
                 })
                 .collect();
@@ -191,7 +193,12 @@ mod tests {
 
     #[test]
     fn values_serialize_untagged() {
-        let v = vec![Value::Int(1), Value::Float(2.5), Value::Str("x".into()), Value::Null];
+        let v = vec![
+            Value::Int(1),
+            Value::Float(2.5),
+            Value::Str("x".into()),
+            Value::Null,
+        ];
         assert_eq!(serde_json::to_string(&v).unwrap(), r#"[1,2.5,"x",null]"#);
     }
 }

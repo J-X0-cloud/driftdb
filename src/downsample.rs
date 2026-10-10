@@ -86,7 +86,9 @@ impl FromStr for DownsampleRule {
         if source.is_empty() {
             return Err(bad("empty source measurement"));
         }
-        let interval = parse_duration(parts[1].trim()).filter(|d| *d > 0).ok_or_else(|| bad("invalid interval"))?;
+        let interval = parse_duration(parts[1].trim())
+            .filter(|d| *d > 0)
+            .ok_or_else(|| bad("invalid interval"))?;
         let aggregates = parts[2]
             .split(',')
             .map(|a| parse_agg(a.trim()).ok_or_else(|| bad(&format!("unknown aggregate {a:?}"))))
@@ -155,7 +157,9 @@ pub struct DownsampleReport {
 pub fn run_rule(db: &Db, rule: &DownsampleRule) -> Result<DownsampleReport> {
     let window = rule.window();
     let horizon = window.window_start(db.now().saturating_sub(rule.lag));
-    let from = db.downsample_watermark(&rule.target).unwrap_or(Timestamp::MIN);
+    let from = db
+        .downsample_watermark(&rule.target)
+        .unwrap_or(Timestamp::MIN);
     let mut report = DownsampleReport {
         target: rule.target.clone(),
         watermark: Some(from).filter(|w| *w != Timestamp::MIN),
@@ -181,9 +185,12 @@ pub fn run_rule(db: &Db, rule: &DownsampleRule) -> Result<DownsampleReport> {
             .ok_or_else(|| Error::corruption(format!("series {id} missing from catalog")))?;
         let mut windows: BTreeMap<Timestamp, Vec<Accumulator>> = BTreeMap::new();
         for (ts, v) in points {
-            let accs = windows
-                .entry(window.window_start(ts))
-                .or_insert_with(|| rule.aggregates.iter().map(|a| Accumulator::new(*a)).collect());
+            let accs = windows.entry(window.window_start(ts)).or_insert_with(|| {
+                rule.aggregates
+                    .iter()
+                    .map(|a| Accumulator::new(*a))
+                    .collect()
+            });
             for acc in accs.iter_mut() {
                 acc.push(ts, v);
             }
@@ -220,7 +227,10 @@ mod tests {
         let r: DownsampleRule = "cpu:5m:mean,max,p99".parse().unwrap();
         assert_eq!(r.source, "cpu");
         assert_eq!(r.interval, 300_000_000_000);
-        assert_eq!(r.aggregates, vec![AggFunc::Mean, AggFunc::Max, AggFunc::Percentile(99.0)]);
+        assert_eq!(
+            r.aggregates,
+            vec![AggFunc::Mean, AggFunc::Max, AggFunc::Percentile(99.0)]
+        );
         assert_eq!(r.target, "cpu_5m");
         assert_eq!(r.lag, r.interval);
         assert_eq!(r.to_string(), "cpu:5m:mean,max,p99:cpu_5m:5m");
@@ -251,7 +261,13 @@ mod tests {
 
     #[test]
     fn output_field_names() {
-        assert_eq!(DownsampleRule::output_field("usage", AggFunc::Mean), "usage_mean");
-        assert_eq!(DownsampleRule::output_field("usage", AggFunc::Percentile(99.9)), "usage_p99_9");
+        assert_eq!(
+            DownsampleRule::output_field("usage", AggFunc::Mean),
+            "usage_mean"
+        );
+        assert_eq!(
+            DownsampleRule::output_field("usage", AggFunc::Percentile(99.9)),
+            "usage_p99_9"
+        );
     }
 }

@@ -213,7 +213,13 @@ mod tests {
 
     #[test]
     fn duration_formatting_roundtrips() {
-        for d in [1, 1_000, 90 * NANOS_PER_SECOND, 5_400 * NANOS_PER_SECOND, 86_400 * NANOS_PER_SECOND + 1] {
+        for d in [
+            1,
+            1_000,
+            90 * NANOS_PER_SECOND,
+            5_400 * NANOS_PER_SECOND,
+            86_400 * NANOS_PER_SECOND + 1,
+        ] {
             assert_eq!(parse_duration(&format_duration(d)), Some(d));
         }
         assert_eq!(format_duration(90 * NANOS_PER_SECOND), "1m30s");
@@ -234,7 +240,10 @@ mod tests {
             Some(1_700_000_000 * NANOS_PER_SECOND)
         );
         assert_eq!(parse_rfc3339("1969-12-31T23:59:59.5Z"), Some(-500_000_000));
-        assert_eq!(parse_rfc3339("2024-02-29 01:02:03.000000001Z"), Some(1_709_168_523_000_000_001));
+        assert_eq!(
+            parse_rfc3339("2024-02-29 01:02:03.000000001Z"),
+            Some(1_709_168_523_000_000_001)
+        );
     }
 
     #[test]
@@ -268,7 +277,10 @@ mod tests {
         ] {
             assert_eq!(parse_rfc3339(&format_rfc3339(ts)), Some(ts), "{ts}");
         }
-        assert_eq!(format_rfc3339(1_700_000_000 * NANOS_PER_SECOND), "2023-11-14T22:13:20Z");
+        assert_eq!(
+            format_rfc3339(1_700_000_000 * NANOS_PER_SECOND),
+            "2023-11-14T22:13:20Z"
+        );
         assert_eq!(format_rfc3339(1_500_000), "1970-01-01T00:00:00.0015Z");
     }
 }

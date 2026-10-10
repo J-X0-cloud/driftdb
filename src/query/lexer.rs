@@ -176,7 +176,10 @@ fn read_quoted(src: &str, start: usize, quote: char) -> Result<(String, usize)> 
             c => out.push(c),
         }
     }
-    Err(err(start, format!("unterminated literal starting with {quote}")))
+    Err(err(
+        start,
+        format!("unterminated literal starting with {quote}"),
+    ))
 }
 
 fn read_number(src: &str, start: usize) -> Result<(TokenKind, usize)> {
@@ -212,7 +215,8 @@ fn read_number(src: &str, start: usize) -> Result<(TokenKind, usize)> {
     }
     // A unit suffix directly after an integer makes a duration; durations
     // may chain several components (`1h30m`).
-    if !is_float && i < bytes.len() && (bytes[i].is_ascii_alphabetic() || src[i..].starts_with('µ')) {
+    if !is_float && i < bytes.len() && (bytes[i].is_ascii_alphabetic() || src[i..].starts_with('µ'))
+    {
         let mut j = i;
         while j < bytes.len() && (bytes[j].is_ascii_alphanumeric() || !bytes[j].is_ascii()) {
             j += 1;
@@ -221,9 +225,15 @@ fn read_number(src: &str, start: usize) -> Result<(TokenKind, usize)> {
         return match crate::query::time::parse_duration(literal) {
             Some(nanos) => Ok((TokenKind::Duration(nanos), j - start)),
             None => {
-                let unit: String = src[i..j].chars().take_while(|c| !c.is_ascii_digit()).collect();
+                let unit: String = src[i..j]
+                    .chars()
+                    .take_while(|c| !c.is_ascii_digit())
+                    .collect();
                 if unit_nanos(&unit).is_none() {
-                    Err(err(start, format!("invalid duration unit {unit:?} in {literal:?}")))
+                    Err(err(
+                        start,
+                        format!("invalid duration unit {unit:?} in {literal:?}"),
+                    ))
                 } else {
                     Err(err(start, format!("invalid duration {literal:?}")))
                 }
@@ -318,7 +328,10 @@ mod tests {
 
     #[test]
     fn comments_are_skipped() {
-        assert_eq!(kinds("a -- comment\n b"), vec![T::Ident("a".into()), T::Ident("b".into()), T::Eof]);
+        assert_eq!(
+            kinds("a -- comment\n b"),
+            vec![T::Ident("a".into()), T::Ident("b".into()), T::Eof]
+        );
     }
 
     #[test]

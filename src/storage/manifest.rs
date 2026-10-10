@@ -134,7 +134,9 @@ impl Manifest {
     fn validate(&self) -> Result<()> {
         for w in self.segments.windows(2) {
             if w[0].seq >= w[1].seq {
-                return Err(Error::Manifest("segment seqs are not strictly ascending".into()));
+                return Err(Error::Manifest(
+                    "segment seqs are not strictly ascending".into(),
+                ));
             }
         }
         let mut ids: Vec<u64> = self.segments.iter().map(|s| s.id).collect();
@@ -199,7 +201,10 @@ mod tests {
         m.store(dir.path()).unwrap();
         let loaded = Manifest::load(dir.path()).unwrap();
         assert_eq!(loaded, m);
-        assert_eq!(loaded.segments.iter().map(|s| s.id).collect::<Vec<_>>(), vec![1, 2]);
+        assert_eq!(
+            loaded.segments.iter().map(|s| s.id).collect::<Vec<_>>(),
+            vec![1, 2]
+        );
         assert!(!dir.path().join("MANIFEST.json.tmp").exists());
     }
 
@@ -218,11 +223,16 @@ mod tests {
     fn invalid_manifests_are_rejected() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join(MANIFEST_FILE), b"{not json").unwrap();
-        assert!(matches!(Manifest::load(dir.path()), Err(Error::Manifest(_))));
+        assert!(matches!(
+            Manifest::load(dir.path()),
+            Err(Error::Manifest(_))
+        ));
 
-        let mut m = Manifest::default();
-        m.segments = vec![meta(5)];
-        m.next_segment_id = 3;
+        let m = Manifest {
+            segments: vec![meta(5)],
+            next_segment_id: 3,
+            ..Manifest::default()
+        };
         m.store(dir.path()).unwrap();
         assert!(Manifest::load(dir.path()).is_err());
     }

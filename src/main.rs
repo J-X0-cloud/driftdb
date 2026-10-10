@@ -16,10 +16,20 @@ use driftdb::storage::segment::Segment;
 use driftdb::{Db, DownsampleRule, Error, Options, Precision};
 
 #[derive(Debug, Parser)]
-#[command(name = "driftdb", version, about = "Embedded time-series storage engine")]
+#[command(
+    name = "driftdb",
+    version,
+    about = "Embedded time-series storage engine"
+)]
 struct Cli {
     /// Database directory.
-    #[arg(long, short = 'd', global = true, env = "DRIFTDB_DATA_DIR", default_value = "driftdb-data")]
+    #[arg(
+        long,
+        short = 'd',
+        global = true,
+        env = "DRIFTDB_DATA_DIR",
+        default_value = "driftdb-data"
+    )]
     data_dir: PathBuf,
 
     #[command(flatten)]
@@ -247,7 +257,8 @@ fn run(cli: Cli) -> driftdb::Result<()> {
                 println!(
                     "merged {:?} -> {} (level {}): {} -> {} points, {} -> {} bytes",
                     r.inputs,
-                    r.output.map_or_else(|| "nothing".into(), |id| format!("segment {id}")),
+                    r.output
+                        .map_or_else(|| "nothing".into(), |id| format!("segment {id}")),
                     r.level,
                     r.points_in,
                     r.points_out,
@@ -259,7 +270,9 @@ fn run(cli: Cli) -> driftdb::Result<()> {
         }
         Command::Retention => {
             if opts.retention.is_none() {
-                return Err(Error::InvalidArgument("pass --retention to apply a policy".into()));
+                return Err(Error::InvalidArgument(
+                    "pass --retention to apply a policy".into(),
+                ));
             }
             let db = Db::open(&cli.data_dir, opts)?;
             println!("removed {} segment(s)", db.enforce_retention()?);
@@ -283,7 +296,8 @@ fn run(cli: Cli) -> driftdb::Result<()> {
             let stats = db.stats()?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&stats).map_err(|e| Error::InvalidArgument(e.to_string()))?
+                serde_json::to_string_pretty(&stats)
+                    .map_err(|e| Error::InvalidArgument(e.to_string()))?
             );
             Ok(())
         }
@@ -298,7 +312,11 @@ fn run(cli: Cli) -> driftdb::Result<()> {
 }
 
 /// Stream line protocol into the database in bounded batches.
-fn write_stream(db: &Db, input: impl BufRead, precision: Precision) -> driftdb::Result<(usize, usize)> {
+fn write_stream(
+    db: &Db,
+    input: impl BufRead,
+    precision: Precision,
+) -> driftdb::Result<(usize, usize)> {
     const BATCH_LINES: usize = 20_000;
     let (mut written, mut expired) = (0, 0);
     let mut batch = String::new();
@@ -345,7 +363,8 @@ fn print_result(result: &driftdb::QueryResult, format: Format, epoch: bool) -> d
         }
         Format::Json => println!(
             "{}",
-            serde_json::to_string_pretty(result).map_err(|e| Error::InvalidArgument(e.to_string()))?
+            serde_json::to_string_pretty(result)
+                .map_err(|e| Error::InvalidArgument(e.to_string()))?
         ),
     }
     Ok(())
@@ -358,7 +377,14 @@ fn shell(db: Db) -> driftdb::Result<()> {
     let mut input = stdin.lock();
     loop {
         if interactive {
-            print!("{}", if statement.is_empty() { "driftdb> " } else { "      -> " });
+            print!(
+                "{}",
+                if statement.is_empty() {
+                    "driftdb> "
+                } else {
+                    "      -> "
+                }
+            );
             io::stdout().flush()?;
         }
         let mut line = String::new();
@@ -439,7 +465,10 @@ fn inspect(path: &Path) -> driftdb::Result<()> {
         );
     }
     per_series.sort_by(|a, b| b.1.cmp(&a.1));
-    println!("\n{:>10}  {:>10}  {:>6}  {:>10}", "series", "points", "blocks", "bytes");
+    println!(
+        "\n{:>10}  {:>10}  {:>6}  {:>10}",
+        "series", "points", "blocks", "bytes"
+    );
     for (sid, pts, nblocks, bytes) in per_series.iter().take(20) {
         println!("{sid:>10}  {pts:>10}  {nblocks:>6}  {bytes:>10}");
     }
@@ -496,9 +525,19 @@ mod tests {
     #[test]
     fn write_stream_reports_global_line_numbers() {
         let dir = tempfile::tempdir().unwrap();
-        let db = Db::open(dir.path(), Options { sync_wal: false, ..Options::default() }).unwrap();
+        let db = Db::open(
+            dir.path(),
+            Options {
+                sync_wal: false,
+                ..Options::default()
+            },
+        )
+        .unwrap();
         let input = "m v=1 1\nm v=2 2\n";
-        assert_eq!(write_stream(&db, input.as_bytes(), Precision::Nanoseconds).unwrap(), (2, 0));
+        assert_eq!(
+            write_stream(&db, input.as_bytes(), Precision::Nanoseconds).unwrap(),
+            (2, 0)
+        );
         let mut body = String::new();
         for i in 0..20_005 {
             body.push_str(&format!("m v={i} {i}\n"));

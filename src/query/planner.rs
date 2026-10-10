@@ -11,7 +11,9 @@ use regex::Regex;
 
 use crate::error::{Error, Result};
 use crate::model::{SeriesId, Timestamp};
-use crate::query::ast::{AggFunc, CmpOp, Expr, Fill, Projection, SelectStatement, TagOp, TimeWindow};
+use crate::query::ast::{
+    AggFunc, CmpOp, Expr, Fill, Projection, SelectStatement, TagOp, TimeWindow,
+};
 use crate::query::time::format_rfc3339;
 use crate::storage::catalog::{MeasurementIndex, SeriesIndex};
 
@@ -144,7 +146,8 @@ impl SelectPlan {
         lines.push(format!(
             "  Order: time {}{}",
             if self.descending { "desc" } else { "asc" },
-            self.limit.map_or_else(String::new, |l| format!(", limit {l}"))
+            self.limit
+                .map_or_else(String::new, |l| format!(", limit {l}"))
         ));
         lines
     }
@@ -173,7 +176,9 @@ fn time_range(time_preds: &[(CmpOp, Timestamp)]) -> Result<(Timestamp, bool, Tim
             CmpOp::LtEq => (None, Some(ts.saturating_add(1))),
             CmpOp::Eq => (Some(ts), Some(ts.saturating_add(1))),
             CmpOp::NotEq => {
-                return Err(Error::query("time != is not supported; use < and > instead"))
+                return Err(Error::query(
+                    "time != is not supported; use < and > instead",
+                ))
             }
         };
         if let Some(lo) = lo {
@@ -242,7 +247,10 @@ pub fn eval_tags(expr: &Expr, m: &MeasurementIndex) -> Result<BTreeSet<SeriesId>
 }
 
 /// Expand projections into concrete output columns.
-fn output_columns(stmt: &SelectStatement, m: Option<&MeasurementIndex>) -> Result<(Vec<OutputColumn>, bool)> {
+fn output_columns(
+    stmt: &SelectStatement,
+    m: Option<&MeasurementIndex>,
+) -> Result<(Vec<OutputColumn>, bool)> {
     let mut columns = Vec::new();
     let mut saw_raw = false;
     let mut saw_agg = false;
@@ -296,7 +304,11 @@ fn output_columns(stmt: &SelectStatement, m: Option<&MeasurementIndex>) -> Resul
 }
 
 /// Build a plan for `stmt` against the series index at time `now`.
-pub fn plan_select(stmt: &SelectStatement, index: &SeriesIndex, now: Timestamp) -> Result<SelectPlan> {
+pub fn plan_select(
+    stmt: &SelectStatement,
+    index: &SeriesIndex,
+    now: Timestamp,
+) -> Result<SelectPlan> {
     let measurement = index.measurement(&stmt.from);
     let (columns, aggregate) = output_columns(stmt, measurement)?;
     if stmt.group_by.time.is_some() && !aggregate {
@@ -361,7 +373,10 @@ pub fn plan_select(stmt: &SelectStatement, index: &SeriesIndex, now: Timestamp) 
 
     let mut candidates = m.series.clone();
     for e in &tag_exprs {
-        candidates = candidates.intersection(&eval_tags(e, m)?).copied().collect();
+        candidates = candidates
+            .intersection(&eval_tags(e, m)?)
+            .copied()
+            .collect();
     }
 
     let fields: BTreeSet<&str> = plan.columns.iter().map(|c| c.field.as_str()).collect();
@@ -429,22 +444,51 @@ mod tests {
     #[test]
     fn tag_filters_select_series() {
         let (_d, cat) = catalog();
-        assert_eq!(ids(&plan(&cat, "SELECT usage FROM cpu WHERE host = 'a'").unwrap()), vec![0]);
-        assert_eq!(ids(&plan(&cat, "SELECT usage FROM cpu WHERE dc != 'east'").unwrap()), vec![1, 2]);
-        assert_eq!(ids(&plan(&cat, "SELECT usage FROM cpu WHERE dc = ''").unwrap()), vec![2]);
-        assert_eq!(ids(&plan(&cat, "SELECT usage FROM cpu WHERE dc =~ /^$/").unwrap()), vec![2]);
-        assert_eq!(ids(&plan(&cat, "SELECT usage FROM cpu WHERE host =~ /[ab]/").unwrap()), vec![0, 1]);
-        assert_eq!(ids(&plan(&cat, "SELECT usage FROM cpu WHERE host !~ /a/").unwrap()), vec![1, 2]);
         assert_eq!(
-            ids(&plan(&cat, "SELECT usage FROM cpu WHERE host = 'a' OR dc = 'west'").unwrap()),
+            ids(&plan(&cat, "SELECT usage FROM cpu WHERE host = 'a'").unwrap()),
+            vec![0]
+        );
+        assert_eq!(
+            ids(&plan(&cat, "SELECT usage FROM cpu WHERE dc != 'east'").unwrap()),
+            vec![1, 2]
+        );
+        assert_eq!(
+            ids(&plan(&cat, "SELECT usage FROM cpu WHERE dc = ''").unwrap()),
+            vec![2]
+        );
+        assert_eq!(
+            ids(&plan(&cat, "SELECT usage FROM cpu WHERE dc =~ /^$/").unwrap()),
+            vec![2]
+        );
+        assert_eq!(
+            ids(&plan(&cat, "SELECT usage FROM cpu WHERE host =~ /[ab]/").unwrap()),
             vec![0, 1]
         );
         assert_eq!(
-            ids(&plan(&cat, "SELECT * FROM cpu WHERE host = 'a' AND (dc = 'east' OR dc = 'x')").unwrap()),
+            ids(&plan(&cat, "SELECT usage FROM cpu WHERE host !~ /a/").unwrap()),
+            vec![1, 2]
+        );
+        assert_eq!(
+            ids(&plan(
+                &cat,
+                "SELECT usage FROM cpu WHERE host = 'a' OR dc = 'west'"
+            )
+            .unwrap()),
+            vec![0, 1]
+        );
+        assert_eq!(
+            ids(&plan(
+                &cat,
+                "SELECT * FROM cpu WHERE host = 'a' AND (dc = 'east' OR dc = 'x')"
+            )
+            .unwrap()),
             vec![0, 3]
         );
         assert!(ids(&plan(&cat, "SELECT usage FROM cpu WHERE host = 'zzz'").unwrap()).is_empty());
-        assert!(plan(&cat, "SELECT usage FROM nope").unwrap().groups.is_empty());
+        assert!(plan(&cat, "SELECT usage FROM nope")
+            .unwrap()
+            .groups
+            .is_empty());
     }
 
     #[test]
@@ -463,7 +507,11 @@ mod tests {
     #[test]
     fn grouping_and_columns() {
         let (_d, cat) = catalog();
-        let p = plan(&cat, "SELECT mean(usage), mean(usage), max(idle) FROM cpu GROUP BY dc").unwrap();
+        let p = plan(
+            &cat,
+            "SELECT mean(usage), mean(usage), max(idle) FROM cpu GROUP BY dc",
+        )
+        .unwrap();
         let names: Vec<&str> = p.columns.iter().map(|c| c.name.as_str()).collect();
         assert_eq!(names, vec!["mean", "mean_1", "max"]);
         let groups: Vec<String> = p.groups.iter().map(|g| g.tags["dc"].clone()).collect();

@@ -27,7 +27,11 @@ fn seed(db: &Db) {
     let mut body = String::new();
     for i in 0..20 {
         let ts = i * 30 * SEC;
-        body.push_str(&format!("cpu,host=a,dc=east usage={},idle={} {ts}\n", i, 100 - i));
+        body.push_str(&format!(
+            "cpu,host=a,dc=east usage={},idle={} {ts}\n",
+            i,
+            100 - i
+        ));
         body.push_str(&format!("cpu,host=b,dc=west usage={} {ts}\n", i * 2));
     }
     body.push_str("mem,host=a free=512 0\n");
@@ -35,7 +39,11 @@ fn seed(db: &Db) {
 }
 
 fn floats(r: &QueryResult, series: usize, col: usize) -> Vec<Option<f64>> {
-    r.series[series].values.iter().map(|row| row[col].as_f64()).collect()
+    r.series[series]
+        .values
+        .iter()
+        .map(|row| row[col].as_f64())
+        .collect()
 }
 
 /// Cells `cols` of the first row of `series`, as floats.
@@ -45,7 +53,11 @@ fn first_row(r: &QueryResult, series: usize, cols: std::ops::Range<usize>) -> Ve
 }
 
 fn times(r: &QueryResult, series: usize) -> Vec<i64> {
-    r.series[series].values.iter().map(|row| row[0].as_i64().unwrap()).collect()
+    r.series[series]
+        .values
+        .iter()
+        .map(|row| row[0].as_i64().unwrap())
+        .collect()
 }
 
 #[test]
@@ -67,14 +79,18 @@ fn wildcard_aligns_fields_of_one_series() {
     let dir = tempfile::tempdir().unwrap();
     let (db, _) = open(dir.path(), 10 * MIN);
     seed(&db);
-    let r = db.query("SELECT * FROM cpu WHERE host = 'a' LIMIT 2").unwrap();
+    let r = db
+        .query("SELECT * FROM cpu WHERE host = 'a' LIMIT 2")
+        .unwrap();
     assert_eq!(r.series[0].columns, vec!["time", "idle", "usage"]);
     assert_eq!(
         r.series[0].values[1],
         vec![Value::Int(30 * SEC), Value::Float(99.0), Value::Float(1.0)]
     );
     // Host b has no idle field: its rows carry nulls there.
-    let r = db.query("SELECT * FROM cpu WHERE host = 'b' LIMIT 1").unwrap();
+    let r = db
+        .query("SELECT * FROM cpu WHERE host = 'b' LIMIT 1")
+        .unwrap();
     assert_eq!(r.series[0].values[0][1], Value::Null);
 }
 
@@ -138,17 +154,32 @@ fn fill_policies_cover_gaps() {
         ))
         .unwrap()
     };
-    assert_eq!(floats(&q("null"), 0, 1), vec![Some(1.0), None, None, Some(4.0)]);
+    assert_eq!(
+        floats(&q("null"), 0, 1),
+        vec![Some(1.0), None, None, Some(4.0)]
+    );
     assert_eq!(floats(&q("none"), 0, 1), vec![Some(1.0), Some(4.0)]);
-    assert_eq!(floats(&q("-1"), 0, 1), vec![Some(1.0), Some(-1.0), Some(-1.0), Some(4.0)]);
-    assert_eq!(floats(&q("previous"), 0, 1), vec![Some(1.0), Some(1.0), Some(1.0), Some(4.0)]);
-    assert_eq!(floats(&q("linear"), 0, 1), vec![Some(1.0), Some(2.0), Some(3.0), Some(4.0)]);
+    assert_eq!(
+        floats(&q("-1"), 0, 1),
+        vec![Some(1.0), Some(-1.0), Some(-1.0), Some(4.0)]
+    );
+    assert_eq!(
+        floats(&q("previous"), 0, 1),
+        vec![Some(1.0), Some(1.0), Some(1.0), Some(4.0)]
+    );
+    assert_eq!(
+        floats(&q("linear"), 0, 1),
+        vec![Some(1.0), Some(2.0), Some(3.0), Some(4.0)]
+    );
 
     // count() reports zero for empty windows instead of null.
     let r = db
         .query("SELECT count(v) FROM m WHERE time >= 0 AND time < 4m GROUP BY time(1m)")
         .unwrap();
-    assert_eq!(floats(&r, 0, 1), vec![Some(1.0), Some(0.0), Some(0.0), Some(1.0)]);
+    assert_eq!(
+        floats(&r, 0, 1),
+        vec![Some(1.0), Some(0.0), Some(0.0), Some(1.0)]
+    );
 }
 
 #[test]
@@ -163,7 +194,9 @@ fn ordering_limits_and_relative_time() {
 
     clock.set(5 * MIN);
     let r = db
-        .query("SELECT count(usage) FROM cpu WHERE host = 'a' AND time >= now() - 1m AND time < now()")
+        .query(
+            "SELECT count(usage) FROM cpu WHERE host = 'a' AND time >= now() - 1m AND time < now()",
+        )
         .unwrap();
     assert_eq!(floats(&r, 0, 1), vec![Some(2.0)]);
     assert_eq!(times(&r, 0), vec![4 * MIN]);
@@ -176,13 +209,23 @@ fn queries_merge_memtable_and_segments() {
     seed(&db);
     db.flush().unwrap();
     // Correct one value and add a new one after the flush.
-    db.write_lines("cpu,host=a,dc=east usage=100 0\ncpu,host=a,dc=east usage=20 600000000000\n", Precision::Nanoseconds)
+    db.write_lines(
+        "cpu,host=a,dc=east usage=100 0\ncpu,host=a,dc=east usage=20 600000000000\n",
+        Precision::Nanoseconds,
+    )
+    .unwrap();
+    let r = db
+        .query("SELECT first(usage), last(usage), count(usage) FROM cpu WHERE host = 'a'")
         .unwrap();
-    let r = db.query("SELECT first(usage), last(usage), count(usage) FROM cpu WHERE host = 'a'").unwrap();
-    assert_eq!(first_row(&r, 0, 1..4), vec![Some(100.0), Some(20.0), Some(21.0)]);
+    assert_eq!(
+        first_row(&r, 0, 1..4),
+        vec![Some(100.0), Some(20.0), Some(21.0)]
+    );
     db.flush().unwrap();
     db.compact_all().unwrap();
-    let r2 = db.query("SELECT first(usage), last(usage), count(usage) FROM cpu WHERE host = 'a'").unwrap();
+    let r2 = db
+        .query("SELECT first(usage), last(usage), count(usage) FROM cpu WHERE host = 'a'")
+        .unwrap();
     assert_eq!(r, r2);
 }
 
@@ -201,19 +244,38 @@ fn show_statements_list_metadata() {
             })
             .collect()
     };
-    assert_eq!(col0(db.query("SHOW MEASUREMENTS").unwrap(), 0), vec!["cpu", "mem"]);
-    assert_eq!(col0(db.query("SHOW TAG KEYS FROM cpu").unwrap(), 0), vec!["dc", "host"]);
-    assert_eq!(col0(db.query("SHOW TAG VALUES WITH KEY = host").unwrap(), 0), vec!["a", "b"]);
-    assert_eq!(col0(db.query("SHOW FIELD KEYS FROM cpu").unwrap(), 0), vec!["idle", "usage"]);
+    assert_eq!(
+        col0(db.query("SHOW MEASUREMENTS").unwrap(), 0),
+        vec!["cpu", "mem"]
+    );
+    assert_eq!(
+        col0(db.query("SHOW TAG KEYS FROM cpu").unwrap(), 0),
+        vec!["dc", "host"]
+    );
+    assert_eq!(
+        col0(db.query("SHOW TAG VALUES WITH KEY = host").unwrap(), 0),
+        vec!["a", "b"]
+    );
+    assert_eq!(
+        col0(db.query("SHOW FIELD KEYS FROM cpu").unwrap(), 0),
+        vec!["idle", "usage"]
+    );
     assert_eq!(
         col0(db.query("SHOW SERIES").unwrap(), 0),
         vec!["cpu,dc=east,host=a", "cpu,dc=west,host=b", "mem,host=a"]
     );
     assert_eq!(
-        col0(db.query("SHOW SERIES FROM cpu WHERE dc =~ /we/").unwrap(), 0),
+        col0(
+            db.query("SHOW SERIES FROM cpu WHERE dc =~ /we/").unwrap(),
+            0
+        ),
         vec!["cpu,dc=west,host=b"]
     );
-    assert!(db.query("SHOW TAG KEYS FROM nothing").unwrap().series.is_empty());
+    assert!(db
+        .query("SHOW TAG KEYS FROM nothing")
+        .unwrap()
+        .series
+        .is_empty());
 }
 
 #[test]
@@ -234,7 +296,10 @@ fn explain_describes_the_plan() {
         })
         .collect();
     let text = text.join("\n");
-    assert!(text.contains("Series: 1 matched in 1 group(s) by host"), "{text}");
+    assert!(
+        text.contains("Series: 1 matched in 1 group(s) by host"),
+        "{text}"
+    );
     assert!(text.contains("0 of 1 segment(s)"), "{text}");
 }
 
@@ -243,11 +308,21 @@ fn empty_and_missing_data() {
     let dir = tempfile::tempdir().unwrap();
     let (db, _) = open(dir.path(), 10 * MIN);
     assert!(db.query("SELECT v FROM nothing").unwrap().series.is_empty());
-    assert!(db.query("SELECT mean(v) FROM nothing GROUP BY time(1m)").unwrap().series.is_empty());
+    assert!(db
+        .query("SELECT mean(v) FROM nothing GROUP BY time(1m)")
+        .unwrap()
+        .series
+        .is_empty());
     seed(&db);
     assert!(db.query("SELECT nope FROM cpu").unwrap().series.is_empty());
-    assert!(db.query("SELECT usage FROM cpu WHERE time > 1h").unwrap().series.is_empty());
-    let err = db.query("SELECT mean(usage) FROM cpu GROUP BY time(1ns) FILL(0)").unwrap_err();
+    assert!(db
+        .query("SELECT usage FROM cpu WHERE time > 1h")
+        .unwrap()
+        .series
+        .is_empty());
+    let err = db
+        .query("SELECT mean(usage) FROM cpu GROUP BY time(1ns) FILL(0)")
+        .unwrap_err();
     assert!(err.to_string().contains("windows"), "{err}");
     assert!(err.is_client_error());
 }
@@ -256,7 +331,8 @@ fn empty_and_missing_data() {
 fn json_shape_is_stable() {
     let dir = tempfile::tempdir().unwrap();
     let (db, _) = open(dir.path(), 10 * MIN);
-    db.write_lines("m,host=a v=1.5 1000", Precision::Nanoseconds).unwrap();
+    db.write_lines("m,host=a v=1.5 1000", Precision::Nanoseconds)
+        .unwrap();
     let r = db.query("SELECT v FROM m GROUP BY host").unwrap();
     assert_eq!(
         serde_json::to_string(&r).unwrap(),

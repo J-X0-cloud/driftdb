@@ -51,7 +51,11 @@ impl MeasurementIndex {
     }
 
     /// Series whose value for tag `key` satisfies `pred`.
-    pub fn with_tag_matching(&self, key: &str, mut pred: impl FnMut(&str) -> bool) -> BTreeSet<SeriesId> {
+    pub fn with_tag_matching(
+        &self,
+        key: &str,
+        mut pred: impl FnMut(&str) -> bool,
+    ) -> BTreeSet<SeriesId> {
         let mut out = BTreeSet::new();
         if let Some(vals) = self.tags.get(key) {
             for (v, ids) in vals {
@@ -136,7 +140,10 @@ impl SeriesIndex {
     }
 
     fn index_key(&mut self, id: SeriesId, key: &SeriesKey) {
-        let m = self.measurements.entry(key.measurement.clone()).or_default();
+        let m = self
+            .measurements
+            .entry(key.measurement.clone())
+            .or_default();
         m.series.insert(id);
         m.fields.entry(key.field.clone()).or_default().insert(id);
         for (k, v) in &key.tags {
@@ -213,7 +220,11 @@ impl Catalog {
     pub fn resolve(&self, keys: &[&SeriesKey]) -> Result<Vec<SeriesId>> {
         {
             let index = self.index.read();
-            if let Some(ids) = keys.iter().map(|k| index.id_of(k)).collect::<Option<Vec<_>>>() {
+            if let Some(ids) = keys
+                .iter()
+                .map(|k| index.id_of(k))
+                .collect::<Option<Vec<_>>>()
+            {
                 return Ok(ids);
             }
         }
@@ -337,7 +348,10 @@ mod tests {
             assert_eq!(m.with_tag("host", "b"), BTreeSet::from([1, 2]));
             assert_eq!(m.with_tag_key("dc"), BTreeSet::from([0]));
             assert_eq!(m.with_field("idle"), BTreeSet::from([2]));
-            assert_eq!(m.with_tag_matching("host", |v| v > "a"), BTreeSet::from([1, 2]));
+            assert_eq!(
+                m.with_tag_matching("host", |v| v > "a"),
+                BTreeSet::from([1, 2])
+            );
             assert!(m.with_tag("host", "zzz").is_empty());
             assert!(idx.measurement("disk").is_none());
             assert_eq!(idx.measurement_names().collect::<Vec<_>>(), vec!["cpu"]);
@@ -351,7 +365,8 @@ mod tests {
         {
             let (mut f, _, _) = RecordFile::open(&path).unwrap();
             // Id 5 when 0 is expected.
-            f.append(&encode_entry(5, &key("m", "a", "v")), true).unwrap();
+            f.append(&encode_entry(5, &key("m", "a", "v")), true)
+                .unwrap();
         }
         assert!(matches!(Catalog::open(&path), Err(Error::Corruption(_))));
     }

@@ -61,7 +61,11 @@ impl BitWriter {
     pub fn write_bits(&mut self, value: u64, n: u32) {
         debug_assert!(n <= 64, "cannot write more than 64 bits at once");
         let mut remaining = n;
-        let value = if n < 64 { value & ((1u64 << n) - 1) } else { value };
+        let value = if n < 64 {
+            value & ((1u64 << n) - 1)
+        } else {
+            value
+        };
         while remaining > 0 {
             if self.used == 8 {
                 self.bytes.push(0);

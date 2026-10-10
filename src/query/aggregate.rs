@@ -134,9 +134,7 @@ impl Accumulator {
             Accumulator::Count(n) => (n > 0).then_some(n as f64),
             Accumulator::Sum { sum, seen, .. } => seen.then_some(sum),
             Accumulator::Mean { sum, n, .. } => (n > 0).then(|| sum / n as f64),
-            Accumulator::Moments { n, m2, .. } => {
-                (n > 1).then(|| (m2 / (n - 1) as f64).sqrt())
-            }
+            Accumulator::Moments { n, m2, .. } => (n > 1).then(|| (m2 / (n - 1) as f64).sqrt()),
             Accumulator::Min(m) | Accumulator::Max(m) => m,
             Accumulator::First(p) | Accumulator::Last(p) => p.map(|(_, v)| v),
             Accumulator::Spread(s) => s.map(|(lo, hi)| hi - lo),

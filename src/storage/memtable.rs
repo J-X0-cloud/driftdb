@@ -71,7 +71,12 @@ impl Memtable {
     }
 
     /// Points of `series` with `start <= ts < end`, sorted by time.
-    pub fn range(&self, series: SeriesId, start: Timestamp, end: Timestamp) -> Vec<(Timestamp, f64)> {
+    pub fn range(
+        &self,
+        series: SeriesId,
+        start: Timestamp,
+        end: Timestamp,
+    ) -> Vec<(Timestamp, f64)> {
         if start >= end {
             return Vec::new();
         }
@@ -118,7 +123,11 @@ impl Memtable {
     }
 
     fn recompute_bounds(&mut self) {
-        self.min_ts = self.series.values().filter_map(|m| m.keys().next().copied()).min();
+        self.min_ts = self
+            .series
+            .values()
+            .filter_map(|m| m.keys().next().copied())
+            .min();
         self.max_ts = self
             .series
             .values()
@@ -179,7 +188,10 @@ mod tests {
         m.insert(3, 1, 1.0);
         m.insert(5, 1, 1.0);
         assert_eq!(m.sorted_series(), vec![3, 5]);
-        assert_eq!(m.series_points(5).collect::<Vec<_>>(), vec![(1, 1.0), (2, 2.0)]);
+        assert_eq!(
+            m.series_points(5).collect::<Vec<_>>(),
+            vec![(1, 1.0), (2, 2.0)]
+        );
         assert_eq!(m.series_points(42).count(), 0);
     }
 }

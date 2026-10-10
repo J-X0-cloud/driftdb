@@ -101,8 +101,8 @@ fn parse_line(
     };
 
     for (field, value) in fields {
-        let key = SeriesKey::new(measurement.clone(), tags.clone(), field)
-            .map_err(|e| e.to_string())?;
+        let key =
+            SeriesKey::new(measurement.clone(), tags.clone(), field).map_err(|e| e.to_string())?;
         out.push(Point::new(key, timestamp, value));
     }
     Ok(())

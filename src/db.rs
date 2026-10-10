@@ -39,6 +39,9 @@ use crate::storage::merge::merge_sorted;
 use crate::storage::segment::{Segment, SegmentWriter};
 use crate::storage::wal::{Wal, WalEntry};
 
+/// A time-sorted run of points for one series.
+type PointRun = Vec<(Timestamp, f64)>;
+
 /// Engine configuration.
 #[derive(Clone)]
 pub struct Options {
@@ -88,10 +91,14 @@ impl std::fmt::Debug for Options {
 impl Options {
     fn validate(&self) -> Result<()> {
         if self.compaction_fanout < 2 {
-            return Err(Error::InvalidArgument("compaction_fanout must be at least 2".into()));
+            return Err(Error::InvalidArgument(
+                "compaction_fanout must be at least 2".into(),
+            ));
         }
         if self.memtable_bytes == 0 {
-            return Err(Error::InvalidArgument("memtable_bytes must be positive".into()));
+            return Err(Error::InvalidArgument(
+                "memtable_bytes must be positive".into(),
+            ));
         }
         if self.retention.is_some_and(|r| r <= 0) {
             return Err(Error::InvalidArgument("retention must be positive".into()));
@@ -269,9 +276,7 @@ impl Db {
 
     /// Oldest timestamp still inside the retention window.
     pub fn retention_cutoff(&self) -> Option<Timestamp> {
-        self.opts
-            .retention
-            .map(|r| self.now().saturating_sub(r))
+        self.opts.retention.map(|r| self.now().saturating_sub(r))
     }
 
     /// Run `f` with shared access to the series index.
@@ -354,7 +359,7 @@ impl Db {
         }
         let (segments, memory) = {
             let st = self.state.read();
-            let memory: Vec<(Vec<(Timestamp, f64)>, Vec<(Timestamp, f64)>)> = ids
+            let memory: Vec<(PointRun, PointRun)> = ids
                 .iter()
                 .map(|&id| {
                     let frozen = st
@@ -475,7 +480,12 @@ impl Db {
         self.wal.lock().remove_below(frozen.wal_floor)?;
         let meta = built.map(|(m, _)| m);
         if let Some(m) = &meta {
-            tracing::debug!(segment = m.id, points = m.points, bytes = m.bytes, "flushed memtable");
+            tracing::debug!(
+                segment = m.id,
+                points = m.points,
+                bytes = m.bytes,
+                "flushed memtable"
+            );
         }
         Ok(meta)
     }
@@ -598,7 +608,9 @@ impl Db {
                 if let Some((_, seg)) = &built {
                     seg.mark_obsolete();
                 }
-                return Err(Error::corruption("compaction inputs vanished from manifest"));
+                return Err(Error::corruption(
+                    "compaction inputs vanished from manifest",
+                ));
             }
             if let Some((meta, _)) = &built {
                 next.add_segment(meta.clone());
@@ -611,7 +623,8 @@ impl Db {
             }
             *manifest = next;
             let mut st = self.state.write();
-            st.segments = order_segments(&manifest, &st.segments, built.as_ref().map(|b| b.1.clone()));
+            st.segments =
+                order_segments(&manifest, &st.segments, built.as_ref().map(|b| b.1.clone()));
         }
         for seg in &segments {
             seg.mark_obsolete();
@@ -658,13 +671,21 @@ impl Db {
             seg.mark_obsolete();
         }
         st.segments = order_segments(&manifest, &st.segments, None);
-        tracing::info!(removed = expired.len(), cutoff, "retention removed segments");
+        tracing::info!(
+            removed = expired.len(),
+            cutoff,
+            "retention removed segments"
+        );
         Ok(expired.len())
     }
 
     /// Watermark of a downsampling rule.
     pub fn downsample_watermark(&self, rule: &str) -> Option<Timestamp> {
-        self.manifest.lock().downsample_watermarks.get(rule).copied()
+        self.manifest
+            .lock()
+            .downsample_watermarks
+            .get(rule)
+            .copied()
     }
 
     /// Persist the watermark of a downsampling rule.
@@ -754,13 +775,19 @@ mod tests {
     }
 
     fn point(host: &str, ts: Timestamp, v: f64) -> Point {
-        Point::new(SeriesKey::new("cpu", [("host", host)], "usage").unwrap(), ts, v)
+        Point::new(
+            SeriesKey::new("cpu", [("host", host)], "usage").unwrap(),
+            ts,
+            v,
+        )
     }
 
     fn read_one(db: &Db, host: &str) -> Vec<(Timestamp, f64)> {
         let key = SeriesKey::new("cpu", [("host", host)], "usage").unwrap();
         let id = db.with_index(|i| i.id_of(&key)).expect("series exists");
-        db.read_series(&[id], Timestamp::MIN, Timestamp::MAX).unwrap().remove(0)
+        db.read_series(&[id], Timestamp::MIN, Timestamp::MAX)
+            .unwrap()
+            .remove(0)
     }
 
     #[test]
@@ -788,7 +815,8 @@ mod tests {
     fn newer_writes_override_flushed_data() {
         let dir = tempfile::tempdir().unwrap();
         let db = Db::open(dir.path(), opts()).unwrap();
-        db.write_points(&[point("a", 1, 1.0), point("a", 2, 1.0)]).unwrap();
+        db.write_points(&[point("a", 1, 1.0), point("a", 2, 1.0)])
+            .unwrap();
         db.flush().unwrap();
         db.write_points(&[point("a", 2, 5.0)]).unwrap();
         db.flush().unwrap();
@@ -820,7 +848,13 @@ mod tests {
         }
         let reports = db.compact().unwrap();
         assert!(!reports.is_empty());
-        let levels: Vec<u32> = db.stats().unwrap().segments.iter().map(|s| s.level).collect();
+        let levels: Vec<u32> = db
+            .stats()
+            .unwrap()
+            .segments
+            .iter()
+            .map(|s| s.level)
+            .collect();
         // 5 flushes with fanout 2: two L0 pairs -> two L1 -> one L2, one L0 left.
         assert_eq!(levels, vec![2, 0]);
         let pts = read_one(&db, "a");
@@ -845,9 +879,19 @@ mod tests {
         )
         .unwrap();
         let summary = db
-            .write_points(&[point("a", 850, 1.0), point("a", 950, 2.0), point("a", 990, 3.0)])
+            .write_points(&[
+                point("a", 850, 1.0),
+                point("a", 950, 2.0),
+                point("a", 990, 3.0),
+            ])
             .unwrap();
-        assert_eq!(summary, WriteSummary { written: 2, expired: 1 });
+        assert_eq!(
+            summary,
+            WriteSummary {
+                written: 2,
+                expired: 1
+            }
+        );
         db.flush().unwrap();
         db.write_points(&[point("a", 1_050, 4.0)]).unwrap();
         db.flush().unwrap();
@@ -870,7 +914,8 @@ mod tests {
             let db = Db::open(dir.path(), opts()).unwrap();
             db.write_points(&[point("a", 1, 1.0)]).unwrap();
             db.flush().unwrap();
-            db.write_points(&[point("a", 2, 2.0), point("a", 1, 3.0)]).unwrap();
+            db.write_points(&[point("a", 2, 2.0), point("a", 1, 3.0)])
+                .unwrap();
             // Dropped without flushing.
         }
         let db = Db::open(dir.path(), opts()).unwrap();

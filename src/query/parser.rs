@@ -469,10 +469,12 @@ impl Parser {
                 self.expect(TokenKind::RParen)?;
                 TimeBase::Now
             }
-            TokenKind::Str(s) => TimeBase::Absolute(parse_rfc3339(&s).ok_or_else(|| Error::Parse {
-                offset: tok.offset,
-                message: format!("invalid RFC 3339 timestamp {s:?}"),
-            })?),
+            TokenKind::Str(s) => {
+                TimeBase::Absolute(parse_rfc3339(&s).ok_or_else(|| Error::Parse {
+                    offset: tok.offset,
+                    message: format!("invalid RFC 3339 timestamp {s:?}"),
+                })?)
+            }
             TokenKind::Int(ns) => TimeBase::Absolute(ns),
             TokenKind::Duration(ns) => TimeBase::Absolute(ns),
             TokenKind::Minus => match self.next().kind {
@@ -572,7 +574,9 @@ mod tests {
 
     #[test]
     fn time_literals() {
-        let s = select("SELECT v FROM m WHERE time > '2023-11-14T22:13:20Z' + 1s AND time <= 1700000100s");
+        let s = select(
+            "SELECT v FROM m WHERE time > '2023-11-14T22:13:20Z' + 1s AND time <= 1700000100s",
+        );
         let Some(Expr::And(a, b)) = s.condition else {
             panic!()
         };
@@ -601,9 +605,18 @@ mod tests {
     #[test]
     fn fill_variants_and_group_star() {
         assert_eq!(select("SELECT count(v) FROM m FILL(none)").fill, Fill::None);
-        assert_eq!(select("SELECT count(v) FROM m FILL(-1.5)").fill, Fill::Value(-1.5));
-        assert_eq!(select("SELECT count(v) FROM m FILL(0)").fill, Fill::Value(0.0));
-        assert_eq!(select("SELECT count(v) FROM m FILL(linear)").fill, Fill::Linear);
+        assert_eq!(
+            select("SELECT count(v) FROM m FILL(-1.5)").fill,
+            Fill::Value(-1.5)
+        );
+        assert_eq!(
+            select("SELECT count(v) FROM m FILL(0)").fill,
+            Fill::Value(0.0)
+        );
+        assert_eq!(
+            select("SELECT count(v) FROM m FILL(linear)").fill,
+            Fill::Linear
+        );
         let g = select("SELECT count(v) FROM m GROUP BY *, time(1h, -15m)").group_by;
         assert!(g.all_tags);
         assert_eq!(g.time.unwrap().offset, 45 * 60_000_000_000);
@@ -611,7 +624,10 @@ mod tests {
 
     #[test]
     fn show_statements() {
-        assert_eq!(parse("SHOW MEASUREMENTS").unwrap(), Statement::ShowMeasurements);
+        assert_eq!(
+            parse("SHOW MEASUREMENTS").unwrap(),
+            Statement::ShowMeasurements
+        );
         assert_eq!(
             parse("show tag keys from cpu").unwrap(),
             Statement::ShowTagKeys {
@@ -631,9 +647,15 @@ mod tests {
         );
         assert!(matches!(
             parse("SHOW SERIES FROM cpu WHERE host = 'a'").unwrap(),
-            Statement::ShowSeries { condition: Some(_), .. }
+            Statement::ShowSeries {
+                condition: Some(_),
+                ..
+            }
         ));
-        assert!(matches!(parse("EXPLAIN SELECT v FROM m").unwrap(), Statement::Explain(_)));
+        assert!(matches!(
+            parse("EXPLAIN SELECT v FROM m").unwrap(),
+            Statement::Explain(_)
+        ));
     }
 
     #[test]

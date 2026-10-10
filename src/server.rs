@@ -162,7 +162,9 @@ async fn query(
             .map_err(|_| Error::InvalidArgument("query body is not valid UTF-8".into()))?,
     };
     if q.trim().is_empty() {
-        return Err(Error::InvalidArgument("missing query: pass ?q= or a request body".into()).into());
+        return Err(
+            Error::InvalidArgument("missing query: pass ?q= or a request body".into()).into(),
+        );
     }
     let db = state.db.clone();
     let result = blocking(move || db.query(&q)).await?;
@@ -335,7 +337,9 @@ mod tests {
     }
 
     fn post(uri: &str, body: &str) -> Request<Body> {
-        Request::post(uri).body(Body::from(body.to_string())).unwrap()
+        Request::post(uri)
+            .body(Body::from(body.to_string()))
+            .unwrap()
     }
 
     fn get(uri: &str) -> Request<Body> {
@@ -345,7 +349,14 @@ mod tests {
     #[tokio::test]
     async fn write_then_query_roundtrip() {
         let (_dir, app) = app();
-        let (status, _) = send(&app, post("/write?precision=s", "cpu,host=a usage=1.5 1\ncpu,host=a usage=2.5 2")).await;
+        let (status, _) = send(
+            &app,
+            post(
+                "/write?precision=s",
+                "cpu,host=a usage=1.5 1\ncpu,host=a usage=2.5 2",
+            ),
+        )
+        .await;
         assert_eq!(status, StatusCode::NO_CONTENT);
 
         let (status, body) = send(&app, get("/query?q=SELECT%20mean(usage)%20FROM%20cpu")).await;
@@ -375,7 +386,9 @@ mod tests {
         }
         let (status, _) = send(
             &app,
-            Request::post("/write").body(Body::from(vec![0xffu8, 0xfe])).unwrap(),
+            Request::post("/write")
+                .body(Body::from(vec![0xffu8, 0xfe]))
+                .unwrap(),
         )
         .await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
@@ -415,7 +428,8 @@ mod tests {
             },
         )
         .unwrap();
-        db.write_lines("m v=1 0\nm v=3 1000", Precision::Nanoseconds).unwrap();
+        db.write_lines("m v=1 0\nm v=3 1000", Precision::Nanoseconds)
+            .unwrap();
         let rules = vec!["m:1m:mean".parse().unwrap()];
         maintenance_pass(&db, &rules).unwrap();
         let stats = db.stats().unwrap();

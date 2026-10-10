@@ -244,10 +244,7 @@ mod tests {
 
         // Floor 2 means file 1 was flushed and must not be replayed.
         let (wal, replay) = Wal::open(&wal_dir, 2, true).unwrap();
-        assert_eq!(
-            replay.entries,
-            vec![entry(2, 20, 2.0), entry(3, 30, 3.0)]
-        );
+        assert_eq!(replay.entries, vec![entry(2, 20, 2.0), entry(3, 30, 3.0)]);
         assert!(!wal_dir.join(file_name(1)).exists());
         assert!(wal.disk_bytes().unwrap() > 0);
     }

@@ -86,7 +86,9 @@ fn raw_group(
 ) -> Vec<Vec<Value>> {
     let mut rows: BTreeMap<(Timestamp, &str), Vec<Option<f64>>> = BTreeMap::new();
     for member in &group.members {
-        let Some(pts) = points.get(&member.id) else { continue };
+        let Some(pts) = points.get(&member.id) else {
+            continue;
+        };
         let targets: Vec<usize> = plan
             .columns
             .iter()
@@ -124,7 +126,12 @@ fn aggregate_group(
         .iter()
         .map(|c| c.func.expect("aggregate plan has functions"))
         .collect();
-    let fresh = || funcs.iter().map(|f| Accumulator::new(*f)).collect::<Vec<_>>();
+    let fresh = || {
+        funcs
+            .iter()
+            .map(|f| Accumulator::new(*f))
+            .collect::<Vec<_>>()
+    };
     // Without GROUP BY time the whole range is one bucket stamped with the
     // lower bound (or the epoch when unbounded).
     let bucket_of = |ts: Timestamp| match plan.window {
@@ -140,7 +147,9 @@ fn aggregate_group(
 
     let mut windows: BTreeMap<Timestamp, Vec<Accumulator>> = BTreeMap::new();
     for member in &group.members {
-        let Some(pts) = points.get(&member.id) else { continue };
+        let Some(pts) = points.get(&member.id) else {
+            continue;
+        };
         let targets: Vec<usize> = plan
             .columns
             .iter()
@@ -291,7 +300,10 @@ fn run_show(stmt: &Statement, idx: &crate::storage::catalog::SeriesIndex) -> Res
         | Statement::ShowTagValues { from, .. }
         | Statement::ShowFieldKeys { from }
         | Statement::ShowSeries { from, .. } => match from {
-            Some(m) => idx.measurement(m).map(|_| vec![m.as_str()]).unwrap_or_default(),
+            Some(m) => idx
+                .measurement(m)
+                .map(|_| vec![m.as_str()])
+                .unwrap_or_default(),
             None => idx.measurement_names().collect(),
         },
         _ => Vec::new(),
@@ -310,8 +322,11 @@ fn run_show(stmt: &Statement, idx: &crate::storage::catalog::SeriesIndex) -> Res
         Statement::ShowTagKeys { .. } => {
             for m in measurements {
                 let mi = idx.measurement(m).expect("listed measurement exists");
-                let values: Vec<Vec<Value>> =
-                    mi.tags.keys().map(|k| vec![Value::Str(k.clone())]).collect();
+                let values: Vec<Vec<Value>> = mi
+                    .tags
+                    .keys()
+                    .map(|k| vec![Value::Str(k.clone())])
+                    .collect();
                 if !values.is_empty() {
                     series.push(single_series(m, &["tagKey"], values));
                 }
@@ -337,8 +352,11 @@ fn run_show(stmt: &Statement, idx: &crate::storage::catalog::SeriesIndex) -> Res
         Statement::ShowFieldKeys { .. } => {
             for m in measurements {
                 let mi = idx.measurement(m).expect("listed measurement exists");
-                let values: Vec<Vec<Value>> =
-                    mi.fields.keys().map(|k| vec![Value::Str(k.clone())]).collect();
+                let values: Vec<Vec<Value>> = mi
+                    .fields
+                    .keys()
+                    .map(|k| vec![Value::Str(k.clone())])
+                    .collect();
                 series.push(single_series(m, &["fieldKey"], values));
             }
         }
@@ -395,7 +413,10 @@ mod tests {
     fn fill_previous_and_value() {
         let mut r = rows(&[None, Some(1.0), None, None, Some(4.0), None]);
         apply_fill(Fill::Previous, &mut r);
-        assert_eq!(col(&r), vec![None, Some(1.0), Some(1.0), Some(1.0), Some(4.0), Some(4.0)]);
+        assert_eq!(
+            col(&r),
+            vec![None, Some(1.0), Some(1.0), Some(1.0), Some(4.0), Some(4.0)]
+        );
         let mut r = rows(&[None, Some(1.0)]);
         apply_fill(Fill::Value(-1.0), &mut r);
         assert_eq!(col(&r), vec![Some(-1.0), Some(1.0)]);
@@ -405,7 +426,10 @@ mod tests {
     fn fill_linear_interpolates_interior_gaps_only() {
         let mut r = rows(&[None, Some(0.0), None, None, Some(3.0), None]);
         apply_fill(Fill::Linear, &mut r);
-        assert_eq!(col(&r), vec![None, Some(0.0), Some(1.0), Some(2.0), Some(3.0), None]);
+        assert_eq!(
+            col(&r),
+            vec![None, Some(0.0), Some(1.0), Some(2.0), Some(3.0), None]
+        );
     }
 
     #[test]

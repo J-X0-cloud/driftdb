@@ -48,17 +48,24 @@ impl SeriesKey {
             return Err(Error::InvalidArgument("measurement name is empty".into()));
         }
         validate_name("field key", &field)?;
-        let mut tags: Vec<(String, String)> =
-            tags.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
+        let mut tags: Vec<(String, String)> = tags
+            .into_iter()
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect();
         for (k, v) in &tags {
             validate_name("tag key", k)?;
             if v.is_empty() {
-                return Err(Error::InvalidArgument(format!("tag {k:?} has an empty value")));
+                return Err(Error::InvalidArgument(format!(
+                    "tag {k:?} has an empty value"
+                )));
             }
         }
         tags.sort();
         if let Some(w) = tags.windows(2).find(|w| w[0].0 == w[1].0) {
-            return Err(Error::InvalidArgument(format!("duplicate tag key {:?}", w[0].0)));
+            return Err(Error::InvalidArgument(format!(
+                "duplicate tag key {:?}",
+                w[0].0
+            )));
         }
         Ok(SeriesKey {
             measurement,
@@ -111,7 +118,9 @@ fn validate_name(kind: &str, name: &str) -> Result<()> {
         return Err(Error::InvalidArgument(format!("{kind} is empty")));
     }
     if RESERVED_NAMES.contains(&name) {
-        return Err(Error::InvalidArgument(format!("{kind} {name:?} is reserved")));
+        return Err(Error::InvalidArgument(format!(
+            "{kind} {name:?} is reserved"
+        )));
     }
     Ok(())
 }

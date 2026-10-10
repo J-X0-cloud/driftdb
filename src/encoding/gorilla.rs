@@ -220,9 +220,8 @@ pub fn decode_values(bytes: &[u8], count: usize, out: &mut Vec<f64>) -> Result<(
                 window = Some(w);
                 w
             } else {
-                window.ok_or_else(|| {
-                    Error::Decode("XOR window reused before being defined".into())
-                })?
+                window
+                    .ok_or_else(|| Error::Decode("XOR window reused before being defined".into()))?
             };
             let significant = 64 - lead - trail;
             let xor = r.read_bits(significant)? << trail;

@@ -37,7 +37,12 @@ fn column(db: &Db, q: &str, col: usize) -> Vec<f64> {
     let r = db.query(q).unwrap();
     r.series
         .first()
-        .map(|s| s.values.iter().map(|row| row[col].as_f64().unwrap()).collect())
+        .map(|s| {
+            s.values
+                .iter()
+                .map(|row| row[col].as_f64().unwrap())
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -73,7 +78,10 @@ fn rollups_are_written_once_per_window() {
     let report = run_rule(&db, &rule).unwrap();
     assert_eq!(report.windows, 4);
     assert_eq!(report.watermark, Some(25 * MIN));
-    assert_eq!(column(&db, "SELECT usage_count FROM cpu_5m WHERE host = 'a'", 1), vec![30.0; 5]);
+    assert_eq!(
+        column(&db, "SELECT usage_count FROM cpu_5m WHERE host = 'a'", 1),
+        vec![30.0; 5]
+    );
 }
 
 #[test]
@@ -95,7 +103,10 @@ fn watermark_survives_restart() {
     let r = db
         .query("SELECT usage_last FROM cpu_5m WHERE host = 'a' ORDER BY time DESC LIMIT 1")
         .unwrap();
-    assert_eq!(r.series[0].values[0], vec![Value::Int(5 * MIN), Value::Float(590.0)]);
+    assert_eq!(
+        r.series[0].values[0],
+        vec![Value::Int(5 * MIN), Value::Float(590.0)]
+    );
 }
 
 #[test]
@@ -113,8 +124,14 @@ fn retention_expires_raw_data_but_keeps_recent_rollups() {
     clock.set(35 * MIN);
     // The cutoff is now 5m: raw points before it are invisible, and so is
     // the rollup stamped 0m, while the one stamped 5m survives.
-    assert_eq!(column(&db, "SELECT count(usage) FROM cpu WHERE host = 'a'", 1), vec![30.0]);
-    assert_eq!(column(&db, "SELECT usage_mean FROM cpu_5m WHERE host = 'a'", 1), vec![445.0]);
+    assert_eq!(
+        column(&db, "SELECT count(usage) FROM cpu WHERE host = 'a'", 1),
+        vec![30.0]
+    );
+    assert_eq!(
+        column(&db, "SELECT usage_mean FROM cpu_5m WHERE host = 'a'", 1),
+        vec![445.0]
+    );
 
     clock.set(60 * MIN);
     assert_eq!(db.enforce_retention().unwrap(), 2);

@@ -245,9 +245,13 @@ impl Segment {
         let mut header = [0u8; 8];
         file.read_exact(&mut header).at(path)?;
         if &header != MAGIC {
-            return Err(Error::corruption(format!("{}: bad header magic", path.display())));
+            return Err(Error::corruption(format!(
+                "{}: bad header magic",
+                path.display()
+            )));
         }
-        file.seek(SeekFrom::Start(len - FOOTER_LEN as u64)).at(path)?;
+        file.seek(SeekFrom::Start(len - FOOTER_LEN as u64))
+            .at(path)?;
         let mut footer = [0u8; FOOTER_LEN];
         file.read_exact(&mut footer).at(path)?;
         let mut cur = Cursor::new(&footer);
@@ -255,9 +259,13 @@ impl Segment {
         let index_len = cur.u32_le()? as u64;
         let index_crc = cur.u32_le()?;
         if cur.bytes(8)? != MAGIC {
-            return Err(Error::corruption(format!("{}: bad footer magic", path.display())));
+            return Err(Error::corruption(format!(
+                "{}: bad footer magic",
+                path.display()
+            )));
         }
-        if index_offset < MAGIC.len() as u64 || index_offset + index_len + FOOTER_LEN as u64 != len {
+        if index_offset < MAGIC.len() as u64 || index_offset + index_len + FOOTER_LEN as u64 != len
+        {
             return Err(Error::corruption(format!(
                 "{}: index bounds do not match file length",
                 path.display()
@@ -267,7 +275,10 @@ impl Segment {
         let mut index_bytes = vec![0u8; index_len as usize];
         file.read_exact(&mut index_bytes).at(path)?;
         if crc32fast::hash(&index_bytes) != index_crc {
-            return Err(Error::corruption(format!("{}: index checksum mismatch", path.display())));
+            return Err(Error::corruption(format!(
+                "{}: index checksum mismatch",
+                path.display()
+            )));
         }
         let (index, mut stats) = parse_index(&index_bytes, index_offset)
             .map_err(|e| Error::corruption(format!("{}: {e}", path.display())))?;
@@ -318,12 +329,21 @@ impl Segment {
     }
 
     /// Points of `series` with `start <= ts < end`, sorted by time.
-    pub fn read_range(&self, series: SeriesId, start: Timestamp, end: Timestamp) -> Result<Vec<(Timestamp, f64)>> {
+    pub fn read_range(
+        &self,
+        series: SeriesId,
+        start: Timestamp,
+        end: Timestamp,
+    ) -> Result<Vec<(Timestamp, f64)>> {
         let mut out = Vec::new();
         if start >= end {
             return Ok(out);
         }
-        for handle in self.blocks(series).iter().filter(|b| b.overlaps(start, end)) {
+        for handle in self
+            .blocks(series)
+            .iter()
+            .filter(|b| b.overlaps(start, end))
+        {
             let points = self.read_block(handle)?;
             if handle.min_ts >= start && handle.max_ts < end {
                 out.extend(points);
@@ -404,7 +424,9 @@ fn parse_index(
     for _ in 0..n_series {
         let series = cur.uvarint()?;
         if prev_series.is_some_and(|p| p >= series) {
-            return Err(Error::Decode("series ids in index are not ascending".into()));
+            return Err(Error::Decode(
+                "series ids in index are not ascending".into(),
+            ));
         }
         prev_series = Some(series);
         let n_blocks = cur.usize()?;
@@ -419,10 +441,14 @@ fn parse_index(
                 .map_err(|_| Error::Decode("block count overflows u32".into()))?;
             let crc = cur.u32_le()?;
             if offset < MAGIC.len() as u64 || offset + u64::from(len) > data_end {
-                return Err(Error::Decode(format!("block at {offset} lies outside the data region")));
+                return Err(Error::Decode(format!(
+                    "block at {offset} lies outside the data region"
+                )));
             }
             if min_ts > max_ts || count == 0 {
-                return Err(Error::Decode(format!("block at {offset} has invalid bounds")));
+                return Err(Error::Decode(format!(
+                    "block at {offset} has invalid bounds"
+                )));
             }
             stats.min_ts = stats.min_ts.min(min_ts);
             stats.max_ts = stats.max_ts.max(max_ts);
@@ -459,7 +485,10 @@ mod tests {
             .collect()
     }
 
-    fn write_segment(dir: &Path, data: &[(SeriesId, Vec<(Timestamp, f64)>)]) -> (PathBuf, SegmentStats) {
+    fn write_segment(
+        dir: &Path,
+        data: &[(SeriesId, Vec<(Timestamp, f64)>)],
+    ) -> (PathBuf, SegmentStats) {
         let path = dir.join("seg.sst");
         let mut w = SegmentWriter::create(&path).unwrap();
         for (id, pts) in data {
@@ -490,7 +519,10 @@ mod tests {
         assert_eq!(seg.series_ids().collect::<Vec<_>>(), vec![1, 7]);
 
         let window = seg.read_range(1, 9_995, 10_030).unwrap();
-        assert_eq!(window.iter().map(|p| p.0).collect::<Vec<_>>(), vec![10_000, 10_010, 10_020]);
+        assert_eq!(
+            window.iter().map(|p| p.0).collect::<Vec<_>>(),
+            vec![10_000, 10_010, 10_020]
+        );
         assert!(seg.may_overlap(1, 24_990, 25_000));
         assert!(!seg.may_overlap(1, 25_000, 30_000));
         assert!(seg.read_range(1, 50, 50).unwrap().is_empty());

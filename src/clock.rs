@@ -58,7 +58,9 @@ impl Clock for ManualClock {
 
 impl fmt::Debug for ManualClock {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ManualClock").field("now", &self.now()).finish()
+        f.debug_struct("ManualClock")
+            .field("now", &self.now())
+            .finish()
     }
 }
 
